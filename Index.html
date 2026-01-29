@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Crossing - Island Life</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { Home, Fish, Bug, Trees, ShoppingBag, Building2, Palette, User, Sun, Moon, Leaf } = lucide;
+
+    const AnimalCrossingGame = () => {
+      const [gameTime, setGameTime] = useState(8); // 0-23 hours
+      const [season, setSeason] = useState('spring');
+      const [bells, setBells] = useState(1000);
+      const [currentView, setCurrentView] = useState('town');
+      const [playerName, setPlayerName] = useState('Player');
+      const [isNaming, setIsNaming] = useState(true);
+      
+      const [inventory, setInventory] = useState([]);
+      const [furniture, setFurniture] = useState([
+        { id: 1, name: 'Wooden Chair', placed: false, x: 0, y: 0 }
+      ]);
+      
+      const [caughtBugs, setCaughtBugs] = useState([]);
+      const [caughtFish, setCaughtFish] = useState([]);
+      const [museumBugs, setMuseumBugs] = useState([]);
+      const [museumFish, setMuseumFish] = useState([]);
+      
+      // Terrain editing state
+      const [islandPermit, setIslandPermit] = useState(false);
+      const [terrainTool, setTerrainTool] = useState('cliff'); // cliff, water, path, demolish
+      const [islandTerrain, setIslandTerrain] = useState(() => {
+        const terrain = [];
+        for (let i = 0; i < 10; i++) {
+          terrain[i] = [];
+          for (let j = 0; j < 10; j++) {
+            terrain[i][j] = { type: 'grass', level: 0 }; // level 0 = ground, 1 = cliff, -1 = water
+          }
+        }
+        return terrain;
+      });
+      const [paths, setPaths] = useState([]);
+      const [bridges, setBridges] = useState([]);
+      
+      const [villagers] = useState([
+        { id: 1, name: 'Cherry', species: 'Dog', personality: 'Peppy', friendship: 0, dialogue: "Hi there! What a beautiful day!" },
+        { id: 2, name: 'Bob', species: 'Cat', personality: 'Lazy', friendship: 0, dialogue: "Pthhpth... I'm so sleepy..." },
+        { id: 3, name: 'Diana', species: 'Deer', personality: 'Snooty', friendship: 0, dialogue: "Oh, hello dear. Lovely weather." },
+        { id: 4, name: 'Ribbot', species: 'Frog', personality: 'Jock', friendship: 0, dialogue: "Time to work out! Wanna join?" }
+      ]);
+      
+      const bugs = [
+        { name: 'Butterfly', rarity: 'common', value: 160, season: ['spring', 'summer'] },
+        { name: 'Ladybug', rarity: 'common', value: 200, season: ['spring', 'summer', 'fall'] },
+        { name: 'Dragonfly', rarity: 'uncommon', value: 500, season: ['summer'] },
+        { name: 'Beetle', rarity: 'uncommon', value: 800, season: ['summer', 'fall'] },
+        { name: 'Scorpion', rarity: 'rare', value: 8000, season: ['summer'] },
+        { name: 'Tarantula', rarity: 'rare', value: 8000, season: ['fall', 'winter'] }
+      ];
+      
+      const fish = [
+        { name: 'Sea Bass', rarity: 'common', value: 400, season: ['spring', 'summer', 'fall', 'winter'] },
+        { name: 'Carp', rarity: 'common', value: 300, season: ['spring', 'summer', 'fall', 'winter'] },
+        { name: 'Koi', rarity: 'uncommon', value: 4000, season: ['spring', 'summer', 'fall'] },
+        { name: 'Goldfish', rarity: 'uncommon', value: 1300, season: ['spring', 'summer', 'fall', 'winter'] },
+        { name: 'Tuna', rarity: 'rare', value: 7000, season: ['winter', 'spring'] },
+        { name: 'Coelacanth', rarity: 'rare', value: 15000, season: ['winter'] }
+      ];
+      
+      const shopItems = [
+        { name: 'Wooden Table', price: 800, type: 'furniture' },
+        { name: 'Cozy Sofa', price: 2000, type: 'furniture' },
+        { name: 'Potted Plant', price: 500, type: 'furniture' },
+        { name: 'Painting', price: 1500, type: 'furniture' },
+        { name: 'Rug', price: 1200, type: 'furniture' },
+        { name: 'Lamp', price: 900, type: 'furniture' }
+      ];
+
+      useEffect(() => {
+        const timer = setInterval(() => {
+          setGameTime(prev => (prev + 1) % 24);
+        }, 30000); // Time passes every 30 seconds
+        return () => clearInterval(timer);
+      }, []);
+
+      const isDaytime = gameTime >= 6 && gameTime < 20;
+
+      const catchBug = () => {
+        const availableBugs = bugs.filter(bug => bug.season.includes(season));
+        if (availableBugs.length === 0) return;
+        
+        const rand = Math.random();
+        let bug;
+        if (rand < 0.6) {
+          bug = availableBugs.filter(b => b.rarity === 'common')[0];
+        } else if (rand < 0.9) {
+          bug = availableBugs.filter(b => b.rarity === 'uncommon')[0];
+        } else {
+          bug = availableBugs.filter(b => b.rarity === 'rare')[0];
+        }
+        
+        if (bug) {
+          setCaughtBugs([...caughtBugs, { ...bug, id: Date.now() }]);
+          alert(`You caught a ${bug.name}! (${bug.value} Bells)`);
+        }
+      };
+
+      const catchFish = () => {
+        const availableFish = fish.filter(f => f.season.includes(season));
+        if (availableFish.length === 0) return;
+        
+        const rand = Math.random();
+        let caught;
+        if (rand < 0.6) {
+          caught = availableFish.filter(f => f.rarity === 'common')[0];
+        } else if (rand < 0.9) {
+          caught = availableFish.filter(f => f.rarity === 'uncommon')[0];
+        } else {
+          caught = availableFish.filter(f => f.rarity === 'rare')[0];
+        }
+        
+        if (caught) {
+          setCaughtFish([...caughtFish, { ...caught, id: Date.now() }]);
+          alert(`You caught a ${caught.name}! (${caught.value} Bells)`);
+        }
+      };
+
+      const sellItem = (item, type) => {
+        setBells(bells + item.value);
+        if (type === 'bug') {
+          setCaughtBugs(caughtBugs.filter(b => b.id !== item.id));
+        } else {
+          setCaughtFish(caughtFish.filter(f => f.id !== item.id));
+        }
+        alert(`Sold ${item.name} for ${item.value} Bells!`);
+      };
+
+      const donateToMuseum = (item, type) => {
+        if (type === 'bug') {
+          if (!museumBugs.find(b => b.name === item.name)) {
+            setMuseumBugs([...museumBugs, item]);
+            setCaughtBugs(caughtBugs.filter(b => b.id !== item.id));
+            alert(`Donated ${item.name} to the museum!`);
+          } else {
+            alert(`The museum already has a ${item.name}!`);
+          }
+        } else {
+          if (!museumFish.find(f => f.name === item.name)) {
+            setMuseumFish([...museumFish, item]);
+            setCaughtFish(caughtFish.filter(f => f.id !== item.id));
+            alert(`Donated ${item.name} to the museum!`);
+          } else {
+            alert(`The museum already has a ${item.name}!`);
+          }
+        }
+      };
+
+      const buyItem = (item) => {
+        if (bells >= item.price) {
+          setBells(bells - item.price);
+          setFurniture([...furniture, { ...item, id: Date.now(), placed: false, x: 0, y: 0 }]);
+          alert(`Purchased ${item.name}!`);
+        } else {
+          alert('Not enough Bells!');
+        }
+      };
+
+      const buyIslandPermit = () => {
+        const cost = 6000;
+        if (bells >= cost) {
+          setBells(bells - cost);
+          setIslandPermit(true);
+          alert('You got the Island Designer permit! You can now terraform your island!');
+        } else {
+          alert(`You need ${cost} Bells for the Island Designer permit!`);
+        }
+      };
+
+      const editTerrain = (row, col) => {
+        if (!islandPermit) {
+          alert('You need the Island Designer permit to terraform!');
+          return;
+        }
+
+        const newTerrain = [...islandTerrain];
+        const currentCell = newTerrain[row][col];
+
+        if (terrainTool === 'cliff') {
+          // Build cliff (raise terrain)
+          if (currentCell.level < 2) {
+            newTerrain[row][col] = { ...currentCell, level: currentCell.level + 1, type: 'cliff' };
+            alert('Built a cliff!');
+          } else {
+            alert('Maximum cliff height reached!');
+          }
+        } else if (terrainTool === 'water') {
+          // Create water
+          if (currentCell.level === 0) {
+            newTerrain[row][col] = { type: 'water', level: -1 };
+            alert('Created a water tile!');
+          } else {
+            alert('Can only place water on ground level!');
+          }
+        } else if (terrainTool === 'path') {
+          // Place path
+          if (currentCell.level === 0 && currentCell.type !== 'water') {
+            const pathExists = paths.find(p => p.row === row && p.col === col);
+            if (!pathExists) {
+              setPaths([...paths, { row, col, type: 'brick' }]);
+              alert('Placed a path!');
+            } else {
+              alert('Path already exists here!');
+            }
+          } else {
+            alert('Can only place paths on flat ground!');
+          }
+        } else if (terrainTool === 'demolish') {
+          // Remove terrain/cliffs/water
+          if (currentCell.level > 0) {
+            newTerrain[row][col] = { type: 'grass', level: currentCell.level - 1 };
+            alert('Demolished cliff level!');
+          } else if (currentCell.type === 'water') {
+            newTerrain[row][col] = { type: 'grass', level: 0 };
+            alert('Filled in water!');
+          } else {
+            // Remove path
+            const pathIndex = paths.findIndex(p => p.row === row && p.col === col);
+            if (pathIndex !== -1) {
+              setPaths(paths.filter((_, i) => i !== pathIndex));
+              alert('Removed path!');
+            } else {
+              alert('Nothing to demolish here!');
+            }
+          }
+        }
+
+        setIslandTerrain(newTerrain);
+      };
+
+      const getTerrainColor = (cell, row, col) => {
+        const path = paths.find(p => p.row === row && p.col === col);
+        if (path) return 'bg-orange-300';
+        
+        if (cell.type === 'water') return 'bg-blue-400';
+        if (cell.level === 0) return 'bg-green-400';
+        if (cell.level === 1) return 'bg-amber-600';
+        if (cell.level === 2) return 'bg-gray-500';
+        return 'bg-green-400';
+      };
+
+      const getTerrainIcon = (cell, row, col) => {
+        const path = paths.find(p => p.row === row && p.col === col);
+        if (path) return '🧱';
+        
+        if (cell.type === 'water') return '💧';
+        if (cell.level === 1) return '⛰️';
+        if (cell.level === 2) return '🏔️';
+        return '🌱';
+      };
+
+      const talkToVillager = (villager) => {
+        alert(`${villager.name}: "${villager.dialogue}"`);
+      };
+
+      if (isNaming) {
+        return (
+          <div className="w-full h-screen bg-gradient-to-b from-green-300 to-green-500 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full">
+              <h1 className="text-3xl font-bold text-green-800 mb-4 text-center">Welcome to Island Life!</h1>
+              <p className="text-gray-600 mb-6 text-center">What's your name?</p>
+              <input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full px-4 py-2 border-2 border-green-400 rounded-lg mb-4 text-center text-lg"
+                placeholder="Enter your name"
+              />
+              <button
+                onClick={() => setIsNaming(false)}
+                className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+              >
+                Start Your Adventure!
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="w-full h-screen bg-gradient-to-b from-sky-300 to-green-400 overflow-hidden">
+          {/* Header */}
+          <div className="bg-green-700 text-white p-4 flex justify-between items-center shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{playerName}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                {isDaytime ? '☀️' : '🌙'}
+                <span>{gameTime}:00</span>
+              </div>
+              <div className="flex items-center gap-1">
+                🍃
+                <span className="capitalize">{season}</span>
+              </div>
+              <div className="font-bold">💰 {bells} Bells</div>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="bg-green-600 text-white p-2 flex gap-2 overflow-x-auto">
+            <button onClick={() => setCurrentView('town')} className={`px-4 py-2 rounded ${currentView === 'town' ? 'bg-green-800' : 'bg-green-700'}`}>
+              🏘️ Town
+            </button>
+            <button onClick={() => setCurrentView('terraform')} className={`px-4 py-2 rounded ${currentView === 'terraform' ? 'bg-green-800' : 'bg-green-700'}`}>
+              🏗️ Island Designer
+            </button>
+            <button onClick={() => setCurrentView('home')} className={`px-4 py-2 rounded ${currentView === 'home' ? 'bg-green-800' : 'bg-green-700'}`}>
+              🏠 Home
+            </button>
+            <button onClick={() => setCurrentView('shop')} className={`px-4 py-2 rounded ${currentView === 'shop' ? 'bg-green-800' : 'bg-green-700'}`}>
+              🛍️ Shop
+            </button>
+            <button onClick={() => setCurrentView('museum')} className={`px-4 py-2 rounded ${currentView === 'museum' ? 'bg-green-800' : 'bg-green-700'}`}>
+              🏛️ Museum
+            </button>
+            <button onClick={() => setCurrentView('inventory')} className={`px-4 py-2 rounded ${currentView === 'inventory' ? 'bg-green-800' : 'bg-green-700'}`}>
+              🎒 Inventory
+            </button>
+          </div>
+
+          {/* Main Content */}
+          <div className="p-6 overflow-y-auto h-[calc(100vh-140px)]">
+            {currentView === 'terraform' && (
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-4 text-center drop-shadow-lg">🏗️ Island Designer</h2>
+                
+                {!islandPermit ? (
+                  <div className="bg-white rounded-lg p-6 shadow-lg text-center max-w-md mx-auto">
+                    <h3 className="text-2xl font-bold mb-4">Island Designer App</h3>
+                    <p className="text-gray-700 mb-4">
+                      With the Island Designer app, you can terraform your island! Build cliffs, create rivers, 
+                      place paths, and shape your island however you like!
+                    </p>
+                    <p className="text-lg font-bold mb-4">Cost: 6,000 Bells</p>
+                    <button 
+                      onClick={buyIslandPermit}
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+                    >
+                      Purchase Island Designer
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="bg-white rounded-lg p-4 shadow-lg mb-4">
+                      <h3 className="text-xl font-bold mb-3">Select Tool</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <button
+                          onClick={() => setTerrainTool('cliff')}
+                          className={`p-3 rounded border-2 ${terrainTool === 'cliff' ? 'border-green-600 bg-green-100' : 'border-gray-300'}`}
+                        >
+                          ⛰️ Build Cliff
+                        </button>
+                        <button
+                          onClick={() => setTerrainTool('water')}
+                          className={`p-3 rounded border-2 ${terrainTool === 'water' ? 'border-blue-600 bg-blue-100' : 'border-gray-300'}`}
+                        >
+                          💧 Create Water
+                        </button>
+                        <button
+                          onClick={() => setTerrainTool('path')}
+                          className={`p-3 rounded border-2 ${terrainTool === 'path' ? 'border-orange-600 bg-orange-100' : 'border-gray-300'}`}
+                        >
+                          🧱 Place Path
+                        </button>
+                        <button
+                          onClick={() => setTerrainTool('demolish')}
+                          className={`p-3 rounded border-2 ${terrainTool === 'demolish' ? 'border-red-600 bg-red-100' : 'border-gray-300'}`}
+                        >
+                          🔨 Demolish
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 shadow-lg">
+                      <h3 className="text-xl font-bold mb-3">Your Island (Click tiles to terraform)</h3>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Current Tool: <span className="font-bold">
+                          {terrainTool === 'cliff' && '⛰️ Build Cliff'}
+                          {terrainTool === 'water' && '💧 Create Water'}
+                          {terrainTool === 'path' && '🧱 Place Path'}
+                          {terrainTool === 'demolish' && '🔨 Demolish'}
+                        </span>
+                      </p>
+                      <div className="inline-block border-4 border-green-800 rounded">
+                        {islandTerrain.map((row, rowIndex) => (
+                          <div key={rowIndex} className="flex">
+                            {row.map((cell, colIndex) => (
+                              <button
+                                key={colIndex}
+                                onClick={() => editTerrain(rowIndex, colIndex)}
+                                className={`w-12 h-12 md:w-16 md:h-16 border border-gray-400 ${getTerrainColor(cell, rowIndex, colIndex)} 
+                                  hover:opacity-80 transition flex items-center justify-center text-2xl relative`}
+                                title={`${cell.type} - Level ${cell.level}`}
+                              >
+                                {getTerrainIcon(cell, rowIndex, colIndex)}
+                                {cell.level > 0 && (
+                                  <span className="absolute top-0 right-0 text-xs bg-black text-white px-1 rounded">
+                                    {cell.level}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 p-3 bg-gray-100 rounded">
+                        <h4 className="font-bold mb-2">Legend:</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                          <div>🌱 Grass (Level 0)</div>
+                          <div>⛰️ Cliff (Level 1)</div>
+                          <div>🏔️ High Cliff (Level 2)</div>
+                          <div>💧 Water</div>
+                          <div>🧱 Path</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentView === 'town' && (
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-6 text-center drop-shadow-lg">Your Island</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-white rounded-lg p-4 shadow-lg">
+                    <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+                      🦋 Catch Bugs
+                    </h3>
+                    <p className="text-gray-600 mb-3">Search for bugs around the island!</p>
+                    <button onClick={catchBug} className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition">
+                      🦋 Catch a Bug
+                    </button>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 shadow-lg">
+                    <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+                      🐟 Go Fishing
+                    </h3>
+                    <p className="text-gray-600 mb-3">Cast your line into the water!</p>
+                    <button onClick={catchFish} className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition">
+                      🎣 Catch a Fish
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg p-4 shadow-lg">
+                  <h3 className="text-xl font-bold mb-4">🏘️ Villagers</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {villagers.map(villager => (
+                      <div key={villager.id} className="border-2 border-green-300 rounded p-3 hover:bg-green-50 cursor-pointer transition"
+                           onClick={() => talkToVillager(villager)}>
+                        <div className="font-bold text-lg">{villager.name}</div>
+                        <div className="text-sm text-gray-600">{villager.species} • {villager.personality}</div>
+                        <div className="text-xs text-gray-500 mt-1">💚 Friendship: {villager.friendship}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentView === 'home' && (
+              <div className="bg-amber-50 rounded-lg p-6 shadow-lg">
+                <h2 className="text-2xl font-bold mb-4">🏠 Your Home</h2>
+                <p className="text-gray-600 mb-4">Decorate your house with furniture!</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {furniture.map(item => (
+                    <div key={item.id} className="border-2 border-amber-300 rounded p-3 bg-white">
+                      <div className="font-bold">{item.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {item.placed ? '✅ Placed' : '📦 In Storage'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {currentView === 'shop' && (
+              <div className="bg-white rounded-lg p-6 shadow-lg">
+                <h2 className="text-2xl font-bold mb-4">🛍️ Nook's Cranny</h2>
+                <p className="text-gray-600 mb-4">Welcome! Check out today's items!</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {shopItems.map((item, index) => (
+                    <div key={index} className="border-2 border-green-300 rounded p-4 bg-green-50">
+                      <div className="font-bold text-lg mb-2">{item.name}</div>
+                      <div className="text-gray-600 mb-3">💰 {item.price} Bells</div>
+                      <button
+                        onClick={() => buyItem(item)}
+                        className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+                      >
+                        Buy
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {currentView === 'museum' && (
+              <div className="bg-white rounded-lg p-6 shadow-lg">
+                <h2 className="text-2xl font-bold mb-4">🏛️ Museum</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-xl font-bold mb-3">🦋 Bug Collection</h3>
+                    <p className="text-sm text-gray-600 mb-2">Donated: {museumBugs.length} species</p>
+                    <div className="space-y-2">
+                      {museumBugs.map((bug, index) => (
+                        <div key={index} className="border border-green-300 rounded p-2 bg-green-50">
+                          {bug.name}
+                        </div>
+                      ))}
+                      {museumBugs.length === 0 && (
+                        <p className="text-gray-500 italic">No bugs donated yet</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold mb-3">🐟 Fish Collection</h3>
+                    <p className="text-sm text-gray-600 mb-2">Donated: {museumFish.length} species</p>
+                    <div className="space-y-2">
+                      {museumFish.map((fish, index) => (
+                        <div key={index} className="border border-blue-300 rounded p-2 bg-blue-50">
+                          {fish.name}
+                        </div>
+                      ))}
+                      {museumFish.length === 0 && (
+                        <p className="text-gray-500 italic">No fish donated yet</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentView === 'inventory' && (
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-6 text-center drop-shadow-lg">🎒 Inventory</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-lg p-4 shadow-lg">
+                    <h3 className="text-xl font-bold mb-3">🦋 Caught Bugs ({caughtBugs.length})</h3>
+                    <div className="space-y-2">
+                      {caughtBugs.map(bug => (
+                        <div key={bug.id} className="border-2 border-green-300 rounded p-3 bg-green-50">
+                          <div className="font-bold">{bug.name}</div>
+                          <div className="text-sm text-gray-600">Value: {bug.value} Bells</div>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => sellItem(bug, 'bug')}
+                              className="flex-1 bg-green-600 text-white py-1 rounded text-sm hover:bg-green-700"
+                            >
+                              Sell
+                            </button>
+                            <button
+                              onClick={() => donateToMuseum(bug, 'bug')}
+                              className="flex-1 bg-blue-600 text-white py-1 rounded text-sm hover:bg-blue-700"
+                            >
+                              Donate
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {caughtBugs.length === 0 && (
+                        <p className="text-gray-500 italic">No bugs in inventory</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 shadow-lg">
+                    <h3 className="text-xl font-bold mb-3">🐟 Caught Fish ({caughtFish.length})</h3>
+                    <div className="space-y-2">
+                      {caughtFish.map(fish => (
+                        <div key={fish.id} className="border-2 border-blue-300 rounded p-3 bg-blue-50">
+                          <div className="font-bold">{fish.name}</div>
+                          <div className="text-sm text-gray-600">Value: {fish.value} Bells</div>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => sellItem(fish, 'fish')}
+                              className="flex-1 bg-green-600 text-white py-1 rounded text-sm hover:bg-green-700"
+                            >
+                              Sell
+                            </button>
+                            <button
+                              onClick={() => donateToMuseum(fish, 'fish')}
+                              className="flex-1 bg-blue-600 text-white py-1 rounded text-sm hover:bg-blue-700"
+                            >
+                              Donate
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {caughtFish.length === 0 && (
+                        <p className="text-gray-500 italic">No fish in inventory</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<AnimalCrossingGame />, document.getElementById('root'));
+  </script>
+</body>
+</html>
